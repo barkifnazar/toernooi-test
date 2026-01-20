@@ -3,54 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tournament Results</title>
+    <title>ՀՄԸՄ Մարզահանդէս</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        .tab-active { border-bottom: 4px solid #1e40af; color: #1e40af; }
+    </style>
 </head>
-<body class="bg-gray-100 font-sans">
+<body class="bg-gray-50">
 
-    <div class="max-w-4xl mx-auto py-10 px-4">
-        <h1 class="text-4xl font-bold text-center text-blue-800 mb-8">Tournament Scoreboard</h1>
-        
-        <div id="loading" class="text-center">Loading latest scores...</div>
-        
-        <div id="match-container" class="grid gap-4">
-            </div>
+    <header class="bg-white shadow-sm py-6 mb-8">
+        <div class="max-w-4xl mx-auto flex flex-col items-center">
+            <img src="logo.png" alt="Tournament Logo" class="h-24 w-auto mb-4">
+            <h1 class="text-3xl font-black text-blue-900 uppercase tracking-widest">Championship 2026</h1>
+        </div>
+    </header>
+
+    <div class="max-w-4xl mx-auto px-4">
+        <div class="flex justify-center space-x-8 mb-8 border-b">
+            <button onclick="switchTab('A')" id="tabA" class="tab-active pb-2 font-bold text-lg">Group A</button>
+            <button onclick="switchTab('B')" id="tabB" class="pb-2 font-bold text-lg text-gray-500">Group B</button>
+        </div>
+
+        <div id="content">
+            <section class="mb-10">
+                <h2 class="text-xl font-bold mb-4">Standings</h2>
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-800 text-white">
+                            <tr>
+                                <th class="p-3">Team</th>
+                                <th class="p-3 text-center">P</th>
+                                <th class="p-3 text-center">GD</th>
+                                <th class="p-3 text-center">Pts</th>
+                            </tr>
+                        </thead>
+                        <tbody id="standings-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-xl font-bold mb-4">Match Results</h2>
+                <div id="match-list" class="grid gap-3"></div>
+            </section>
+        </div>
     </div>
 
     <script>
-        // PASTE YOUR PUBLISHED CSV URL BELOW
-        const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSusSuipuGYyDQofq2oB41j-FUeAKRyG-PwzzgVEHh_lbHY1EIMQjTdzDo8fC9t_i8CvxkVMddAexa5/pub?output=csv';
+        const sheetUrl = 'REPLACE_WITH_YOUR_CSV_URL';
+        let allMatches = [];
+        let currentGroup = 'A';
+
+        function switchTab(group) {
+            currentGroup = group;
+            document.getElementById('tabA').className = group === 'A' ? 'tab-active pb-2 font-bold text-lg' : 'pb-2 font-bold text-lg text-gray-500';
+            document.getElementById('tabB').className = group === 'B' ? 'tab-active pb-2 font-bold text-lg' : 'pb-2 font-bold text-lg text-gray-500';
+            render();
+        }
 
         async function init() {
             Papa.parse(sheetUrl, {
                 download: true,
                 header: true,
                 complete: function(results) {
-                    displayMatches(results.data);
+                    allMatches = results.data.filter(m => m.HomeTeam); // Remove empty rows
+                    render();
                 }
             });
         }
 
-        function displayMatches(matches) {
-            const container = document.getElementById('match-container');
-            const loading = document.getElementById('loading');
-            loading.classList.add('hidden');
+        function calculateStandings(matches) {
+            const stats = {};
+            matches.forEach(m => {
+                [m.HomeTeam, m.AwayTeam].forEach(t => {
+                    if (!stats[t]) stats[t] = { name: t, p: 0, gd: 0, pts: 0 };
+                });
 
-            matches.forEach(match => {
-                if(!match.HomeTeam) return; // Skip empty rows
-
-                const card = `
-                    <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-center">
-                        <div class="flex-1 text-right font-bold text-lg">${match.HomeTeam}</div>
-                        <div class="mx-4 bg-gray-800 text-white px-4 py-2 rounded font-mono text-xl">
-                            ${match.HomeScore} - ${match.AwayScore}
-                        </div>
-                        <div class="flex-1 text-left font-bold text-lg">${match.AwayTeam}</div>
-                    </div>
-                `;
-                container.innerHTML += card;
+                const hS = parseInt(m.HomeScore);
+                const aS = parseInt(m.AwayScore);
+                
+                if (!isNaN(hS) && !isNaN(aS)) {
+                    stats[m.HomeTeam].p++;
+                    stats[m.AwayTeam].p++;
+                    stats[m.HomeTeam].gd += (hS - aS);
+                    stats[m.AwayTeam].gd += (aS - hS);
+                    if (hS > aS) stats[m.HomeTeam].pts += 3;
+                    else if (hS < aS) stats[m.AwayTeam].pts += 3;
+                    else { stats[m.HomeTeam].pts += 1; stats[m.AwayTeam].pts += 1; }
+                }
             });
+            return Object.values(stats).sort((a,b) => b.pts - a.pts || b.gd - a.gd);
+        }
+
+        function render() {
+            const groupMatches = allMatches.filter(m => m.Group === currentGroup);
+            
+            // Render Standings
+            const standings = calculateStandings(groupMatches);
+            document.getElementById('standings-body').innerHTML = standings.map(t => `
+                <tr class="border-b">
+                    <td class="p-3 font-medium">${t.name}</td>
+                    <td class="p-3 text-center">${t.p}</td>
+                    <td class="p-3 text-center">${t.gd}</td>
+                    <td class="p-3 text-center font-bold">${t.pts}</td>
+                </tr>
+            `).join('');
+
+            // Render Matches
+            document.getElementById('match-list').innerHTML = groupMatches.map(m => `
+                <div class="bg-white p-4 rounded shadow-sm border-l-4 border-blue-500 flex justify-between items-center">
+                    <span class="w-1/3 text-right font-semibold">${m.HomeTeam}</span>
+                    <span class="bg-gray-100 px-3 py-1 rounded font-bold">${m.HomeScore} - ${m.AwayScore}</span>
+                    <span class="w-1/3 text-left font-semibold">${m.AwayTeam}</span>
+                </div>
+            `).join('');
         }
 
         init();
