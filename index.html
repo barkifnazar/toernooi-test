@@ -3,121 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ՀՄԸՄ Մարզահանդէս</title>
+    <title>Մարզահանդէս</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        .tab-active { border-bottom: 4px solid #1e40af; color: #1e40af; }
+        .tab-active { border-bottom: 4px solid #1e40af; color: #1e40af; font-weight: bold; }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-100 pb-10">
 
-    <header class="bg-white shadow-sm py-6 mb-8">
-        <div class="max-w-4xl mx-auto flex flex-col items-center">
-            <img src="logo.png" alt="Tournament Logo" class="h-24 w-auto mb-4">
-            <h1 class="text-3xl font-black text-blue-900 uppercase tracking-widest">ՀՄԸՄ Ալմելօ Մարզահանդէս 2026</h1>
-        </div>
+    <header class="bg-white shadow-md py-6 mb-6 text-center">
+        <img src="logo.png" alt="Logo" class="h-20 mx-auto mb-2">
+        <h1 class="text-2xl font-bold text-gray-800">ՀՄԸՄ Ալմելօ Մարզահանդէս 2026</h1>
+        <button onclick="init()" class="mt-4 bg-blue-600 text-white px-4 py-1 rounded-full text-sm hover:bg-blue-700 transition">
+            🔄 Verversen
+        </button>
     </header>
 
     <div class="max-w-4xl mx-auto px-4">
-        <div class="flex justify-center space-x-8 mb-8 border-b">
-            <button onclick="switchTab('A')" id="tabA" class="tab-active pb-2 font-bold text-lg">Group A</button>
-            <button onclick="switchTab('B')" id="tabB" class="pb-2 font-bold text-lg text-gray-500">Group B</button>
+        <nav class="flex justify-center space-x-6 mb-6 border-b border-gray-300">
+            <button onclick="switchTab('A')" id="btnA" class="tab-active py-2">Group A</button>
+            <button onclick="switchTab('B')" id="btnB" class="py-2 text-gray-500">Group B</button>
+            <button onclick="switchTab('KO')" id="btnKO" class="py-2 text-gray-500">Knockout</button>
+        </nav>
+
+        <div id="view-groups">
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
+                <table class="w-full text-sm sm:text-base">
+                    <thead class="bg-gray-800 text-white text-left">
+                        <tr>
+                            <th class="p-3 w-12">#</th>
+                            <th class="p-3">Team</th>
+                            <th class="p-3 text-center">P</th>
+                            <th class="p-3 text-center">GF</th>
+                            <th class="p-3 text-center">GA</th>
+                            <th class="p-3 text-center">GD</th>
+                            <th class="p-3 text-center font-bold">Pts</th>
+                        </tr>
+                    </thead>
+                    <tbody id="standings-body"></tbody>
+                </table>
+            </div>
+
+            <h3 class="font-bold text-gray-700 mb-4 uppercase tracking-wide">Match Schedule</h3>
+            <div id="match-list" class="space-y-3"></div>
         </div>
 
-        <div id="content">
-            <section class="mb-10">
-                <h2 class="text-xl font-bold mb-4">Standen</h2>
-                <div class="bg-white rounded-lg shadow overflow-hidden">
-                    <table class="w-full text-left">
-                        <thead class="bg-gray-800 text-white">
-                            <tr>
-                                <th class="p-3">Team</th>
-                                <th class="p-3 text-center">P</th>
-                                <th class="p-3 text-center">GD</th>
-                                <th class="p-3 text-center">Pts</th>
-                            </tr>
-                        </thead>
-                        <tbody id="standings-body"></tbody>
-                    </table>
+        <div id="view-ko" class="hidden">
+            <h3 class="text-center font-bold text-xl mb-6">Knockout Phase</h3>
+            <div id="ko-container" class="space-y-8">
                 </div>
-            </section>
-
-            <section>
-                <h2 class="text-xl font-bold mb-4">Resultaten</h2>
-                <div id="match-list" class="grid gap-3"></div>
-            </section>
         </div>
     </div>
 
     <script>
         const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSusSuipuGYyDQofq2oB41j-FUeAKRyG-PwzzgVEHh_lbHY1EIMQjTdzDo8fC9t_i8CvxkVMddAexa5/pub?output=csv';
-        let allMatches = [];
-        let currentGroup = 'A';
+        let allData = [];
+        let currentTab = 'A';
 
-        function switchTab(group) {
-            currentGroup = group;
-            document.getElementById('tabA').className = group === 'A' ? 'tab-active pb-2 font-bold text-lg' : 'pb-2 font-bold text-lg text-gray-500';
-            document.getElementById('tabB').className = group === 'B' ? 'tab-active pb-2 font-bold text-lg' : 'pb-2 font-bold text-lg text-gray-500';
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('view-groups').classList.toggle('hidden', tab === 'KO');
+            document.getElementById('view-ko').classList.toggle('hidden', tab !== 'KO');
+            
+            ['A', 'B', 'KO'].forEach(t => {
+                document.getElementById('btn' + t).className = (tab === t) ? 'tab-active py-2' : 'py-2 text-gray-500';
+            });
             render();
         }
 
         async function init() {
             Papa.parse(sheetUrl, {
-                download: true,
-                header: true,
+                download: true, header: true,
                 complete: function(results) {
-                    allMatches = results.data.filter(m => m.HomeTeam); // Remove empty rows
+                    allData = results.data.filter(r => r.HomeTeam);
                     render();
                 }
             });
         }
 
-        function calculateStandings(matches) {
-            const stats = {};
+        function calculateStandings(group) {
+            const matches = allData.filter(m => m.Group === group);
+            const teams = {};
+            
             matches.forEach(m => {
                 [m.HomeTeam, m.AwayTeam].forEach(t => {
-                    if (!stats[t]) stats[t] = { name: t, p: 0, gd: 0, pts: 0 };
+                    if (!teams[t]) teams[t] = { name: t, p: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
                 });
 
                 const hS = parseInt(m.HomeScore);
                 const aS = parseInt(m.AwayScore);
-                
+
                 if (!isNaN(hS) && !isNaN(aS)) {
-                    stats[m.HomeTeam].p++;
-                    stats[m.AwayTeam].p++;
-                    stats[m.HomeTeam].gd += (hS - aS);
-                    stats[m.AwayTeam].gd += (aS - hS);
-                    if (hS > aS) stats[m.HomeTeam].pts += 3;
-                    else if (hS < aS) stats[m.AwayTeam].pts += 3;
-                    else { stats[m.HomeTeam].pts += 1; stats[m.AwayTeam].pts += 1; }
+                    teams[m.HomeTeam].p++; teams[m.AwayTeam].p++;
+                    teams[m.HomeTeam].gf += hS; teams[m.HomeTeam].ga += aS;
+                    teams[m.AwayTeam].gf += aS; teams[m.AwayTeam].ga += hS;
+                    teams[m.HomeTeam].gd = teams[m.HomeTeam].gf - teams[m.HomeTeam].ga;
+                    teams[m.AwayTeam].gd = teams[m.AwayTeam].gf - teams[m.AwayTeam].ga;
+                    if (hS > aS) teams[m.HomeTeam].pts += 3;
+                    else if (aS > hS) teams[m.AwayTeam].pts += 3;
+                    else { teams[m.HomeTeam].pts += 1; teams[m.AwayTeam].pts += 1; }
                 }
             });
-            return Object.values(stats).sort((a,b) => b.pts - a.pts || b.gd - a.gd);
+
+            return Object.values(teams).sort((a,b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
         }
 
         function render() {
-            const groupMatches = allMatches.filter(m => m.Group === currentGroup);
-            
-            // Render Standings
-            const standings = calculateStandings(groupMatches);
-            document.getElementById('standings-body').innerHTML = standings.map(t => `
-                <tr class="border-b">
-                    <td class="p-3 font-medium">${t.name}</td>
+            if (currentTab === 'KO') {
+                renderKnockout();
+                return;
+            }
+
+            const standings = calculateStandings(currentTab);
+            document.getElementById('standings-body').innerHTML = standings.map((t, i) => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3 text-gray-400 font-bold">${i + 1}</td>
+                    <td class="p-3 font-semibold">${t.name}</td>
                     <td class="p-3 text-center">${t.p}</td>
-                    <td class="p-3 text-center">${t.gd}</td>
-                    <td class="p-3 text-center font-bold">${t.pts}</td>
+                    <td class="p-3 text-center">${t.gf}</td>
+                    <td class="p-3 text-center">${t.ga}</td>
+                    <td class="p-3 text-center text-gray-600">${t.gd > 0 ? '+'+t.gd : t.gd}</td>
+                    <td class="p-3 text-center font-bold text-blue-700">${t.pts}</td>
                 </tr>
             `).join('');
 
-            // Render Matches
-            document.getElementById('match-list').innerHTML = groupMatches.map(m => `
-                <div class="bg-white p-4 rounded shadow-sm border-l-4 border-blue-500 flex justify-between items-center">
-                    <span class="w-1/3 text-right font-semibold">${m.HomeTeam}</span>
-                    <span class="bg-gray-100 px-3 py-1 rounded font-bold">${m.HomeScore} - ${m.AwayScore}</span>
-                    <span class="w-1/3 text-left font-semibold">${m.AwayTeam}</span>
+            const matches = allData.filter(m => m.Group === currentTab);
+            document.getElementById('match-list').innerHTML = matches.map(m => `
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <div class="flex justify-between text-xs text-gray-500 mb-2 uppercase font-bold tracking-tighter">
+                        <span>${m.Time || 'TBD'}</span>
+                        <span>${m.Location || 'Field'}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="w-2/5 text-right font-bold text-gray-800">${m.HomeTeam}</span>
+                        <span class="px-4 py-1 bg-gray-900 text-white rounded font-mono text-lg mx-2">
+                            ${m.HomeScore !== "" ? m.HomeScore : '-'} : ${m.AwayScore !== "" ? m.AwayScore : '-'}
+                        </span>
+                        <span class="w-2/5 text-left font-bold text-gray-800">${m.AwayTeam}</span>
+                    </div>
                 </div>
             `).join('');
+        }
+
+        function renderKnockout() {
+            const groupA = calculateStandings('A');
+            const groupB = calculateStandings('B');
+
+            // Logic: 1st Group A vs 2nd Group B, 1st Group B vs 2nd Group A
+            const semi1 = { h: groupA[0]?.name || '1st Group A', a: groupB[1]?.name || '2nd Group B' };
+            const semi2 = { h: groupB[0]?.name || '1st Group B', a: groupA[1]?.name || '2nd Group A' };
+
+            document.getElementById('ko-container').innerHTML = `
+                <div class="space-y-4">
+                    <h4 class="text-blue-800 font-bold border-l-4 border-blue-800 pl-2">Semi-Finals</h4>
+                    <div class="bg-white p-4 rounded shadow"> ${semi1.h} vs ${semi1.a} </div>
+                    <div class="bg-white p-4 rounded shadow"> ${semi2.h} vs ${semi2.a} </div>
+                </div>
+                <div class="space-y-4">
+                    <h4 class="text-red-800 font-bold border-l-4 border-red-800 pl-2">Final</h4>
+                    <div class="bg-yellow-100 p-6 rounded-xl border-2 border-yellow-400 text-center font-bold text-xl shadow-lg">
+                        Winner SF1 vs Winner SF2
+                    </div>
+                </div>
+            `;
         }
 
         init();
