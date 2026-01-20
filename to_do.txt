@@ -1,0 +1,6 @@
+- Controle volledig vanuit spreadsheet ipv berekening op de website
+- Spreadsheet goed controleren hoe ranking gedaan wordt
+- Toevoegen W/L/D aan tabel
+
+
+- Opmaak?
