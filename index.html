@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Results</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <div class="max-w-4xl mx-auto py-10 px-4">
+        <h1 class="text-4xl font-bold text-center text-blue-800 mb-8">Tournament Scoreboard</h1>
+        
+        <div id="loading" class="text-center">Loading latest scores...</div>
+        
+        <div id="match-container" class="grid gap-4">
+            </div>
+    </div>
+
+    <script>
+        // PASTE YOUR PUBLISHED CSV URL BELOW
+        const sheetUrl = 'REPLACE_WITH_YOUR_CSV_URL';
+
+        async function init() {
+            Papa.parse(sheetUrl, {
+                download: true,
+                header: true,
+                complete: function(results) {
+                    displayMatches(results.data);
+                }
+            });
+        }
+
+        function displayMatches(matches) {
+            const container = document.getElementById('match-container');
+            const loading = document.getElementById('loading');
+            loading.classList.add('hidden');
+
+            matches.forEach(match => {
+                if(!match.HomeTeam) return; // Skip empty rows
+
+                const card = `
+                    <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-center">
+                        <div class="flex-1 text-right font-bold text-lg">${match.HomeTeam}</div>
+                        <div class="mx-4 bg-gray-800 text-white px-4 py-2 rounded font-mono text-xl">
+                            ${match.HomeScore} - ${match.AwayScore}
+                        </div>
+                        <div class="flex-1 text-left font-bold text-lg">${match.AwayTeam}</div>
+                    </div>
+                `;
+                container.innerHTML += card;
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
